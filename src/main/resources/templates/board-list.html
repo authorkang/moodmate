@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mood Journals List</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .btn-primary {
+      background-color: #e3f0ff;
+      color: #0d6efd;
+      border: none;
+    }
+    .btn-primary:hover, .btn-primary:focus {
+      background-color: #0d6efd;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+<div class="d-flex align-items-center justify-content-center min-vh-100">
+  <div class="container py-3">
+    <a href="/board" class="btn btn-secondary mb-3">Back</a>
+    <h2 class="mb-4 text-center">Mood Journal List</h2>
+    <div class="d-flex align-items-center mb-4 justify-content-center">
+      <label for="filter" class="me-2 fw-bold"> 
+        <select id="filter" class="form-select d-inline-block w-auto me-2">
+          <option value="0">Title</option>
+          <option value="1">Writer</option>
+          <option value="2">Age</option>
+        </select>
+      </label>
+      <input type="text" id="keyword" class="form-control w-auto me-2" placeholder="Enter keyword" style="max-width:200px;">
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped table-hover align-middle text-center" id="journalTable">
+        <thead class="table-light">
+          <tr>
+            <th id="titleHeader" style="cursor:pointer;" title="Click to sort">
+              Title <span id="titleSortIcon" style="color:#0d6efd;"></span><span class="sort-arrows" id="titleSortArrows" style="color:#ccc;">▲▼</span>
+            </th>
+            <th>Writer</th>
+            <th id="ageHeader" style="cursor:pointer;" title="Click to sort">
+              Age <span id="ageSortIcon" style="color:#0d6efd;"></span><span class="sort-arrows" id="ageSortArrows" style="color:#ccc;">▲▼</span>
+            </th>
+            <th id="dateHeader" style="cursor:pointer;" title="Click to sort">
+              Date <span id="dateSortIcon" style="color:#0d6efd;"></span><span class="sort-arrows" id="dateSortArrows" style="color:#ccc;">▲▼</span>
+            </th>
+            <th th:if="${session.loginRole == 'ADMIN'}">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="board: ${boardList}">
+            <td><a th:href="@{|/board/${board.id}|}" th:text="${board.boardTitle}"></a></td>
+            <td th:text="${board.boardWriter}"></td>
+            <td th:text="${board.writerAge}"></td>
+            <td th:text="*{#temporals.format(board.boardCreatedTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
+            <td th:if="${session.loginRole == 'ADMIN'}">
+              <a th:href="@{|/board/delete/${board.id}|}" class="btn btn-primary btn-lg w-100">Delete</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <script>
+    // === [Table Filtering JS] ===
+    document.addEventListener('DOMContentLoaded', function() {
+      const filterSelect = document.getElementById('filter');
+      const keywordInput = document.getElementById('keyword');
+      const table = document.getElementById('journalTable');
+      const tbody = table.querySelector('tbody');
+      function filterTable() {
+        const colIdx = parseInt(filterSelect.value, 10);
+        const keyword = keywordInput.value.trim().toLowerCase();
+        Array.from(tbody.rows).forEach(row => {
+          const cell = row.cells[colIdx];
+          if (!keyword || (cell && cell.textContent.toLowerCase().includes(keyword))) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      }
+      filterSelect.addEventListener('change', filterTable);
+      keywordInput.addEventListener('input', filterTable);
+
+      // === [Add sorting feature] ===
+      let titleSortAsc = true;
+      let ageSortAsc = true;
+      let dateSortAsc = true;
+      const titleHeader = document.getElementById('titleHeader');
+      const ageHeader = document.getElementById('ageHeader');
+      const dateHeader = document.getElementById('dateHeader');
+      const titleSortIcon = document.getElementById('titleSortIcon');
+      const ageSortIcon = document.getElementById('ageSortIcon');
+      const dateSortIcon = document.getElementById('dateSortIcon');
+
+      function sortTable(colIdx, asc, type) {
+        const rows = Array.from(tbody.rows).filter(row => row.style.display !== 'none');
+        rows.sort((a, b) => {
+          let aVal = a.cells[colIdx].textContent.trim();
+          let bVal = b.cells[colIdx].textContent.trim();
+          if (type === 'number') {
+            aVal = parseInt(aVal, 10);
+            bVal = parseInt(bVal, 10);
+            if (isNaN(aVal)) aVal = 0;
+            if (isNaN(bVal)) bVal = 0;
+          } else if (type === 'date') {
+            aVal = new Date(aVal);
+            bVal = new Date(bVal);
+          } else {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+          }
+          if (aVal < bVal) return asc ? -1 : 1;
+          if (aVal > bVal) return asc ? 1 : -1;
+          return 0;
+        });
+        rows.forEach(row => tbody.appendChild(row));
+      }
+
+      function updateSortIcons(active, direction) {
+        // Show all together (visible)
+        document.getElementById('titleSortArrows').style.display = '';
+        document.getElementById('ageSortArrows').style.display = '';
+        document.getElementById('dateSortArrows').style.display = '';
+        // Hide all blue icons
+        titleSortIcon.textContent = '';
+        ageSortIcon.textContent = '';
+        dateSortIcon.textContent = '';
+        // When sorting, only the relevant icon is shown, hide blue icons and show gray icons
+        if (active === 'title') {
+          document.getElementById('titleSortArrows').style.display = 'none';
+          titleSortIcon.textContent = direction === 'asc' ? '▲' : '▼';
+        }
+        if (active === 'age') {
+          document.getElementById('ageSortArrows').style.display = 'none';
+          ageSortIcon.textContent = direction === 'asc' ? '▲' : '▼';
+        }
+        if (active === 'date') {
+          document.getElementById('dateSortArrows').style.display = 'none';
+          dateSortIcon.textContent = direction === 'asc' ? '▲' : '▼';
+        }
+      }
+      titleHeader.addEventListener('click', function() {
+        sortTable(0, titleSortAsc, 'string');
+        updateSortIcons('title', titleSortAsc ? 'asc' : 'desc');
+        titleSortAsc = !titleSortAsc;
+      });
+      ageHeader.addEventListener('click', function() {
+        sortTable(2, ageSortAsc, 'number');
+        updateSortIcons('age', ageSortAsc ? 'asc' : 'desc');
+        ageSortAsc = !ageSortAsc;
+      });
+      dateHeader.addEventListener('click', function() {
+        sortTable(3, dateSortAsc, 'date');
+        updateSortIcons('date', dateSortAsc ? 'asc' : 'desc');
+        dateSortAsc = !dateSortAsc;
+      });
+    });
+    // === [Table Filtering JS End] ===
+    </script>
+  </div>
+</div>
+</body>
+</html>
